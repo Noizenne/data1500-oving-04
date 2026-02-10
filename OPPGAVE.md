@@ -104,12 +104,46 @@ GRANT SELECT ON klasserom to student_1;
 GRANT SELECT ON student_klasserom to student_1;
 ```
 
-For å bruke det:
+For lærere
 
+- Opprette rolle
+
+```
+CREATE ROLE lærer_1 LOGIN PASSWORD 'lærer123';
+``` 
+
+- Opprette lærere
+
+ ```
+ CREATE TABLE lærere (id INT PRIMARY KEY, navn VARCHAR(50));
+ ```
+
+- Opprette koblingstabell
+
+``` 
+CREATE TABLE lærere_klasserom (
+    lærer_id INT,
+    klasserom_kode VARCHAR(20),
+    PRIMARY KEY (lærer_id, klasserom_kode),
+    FOREIGN KEY (lærer_id) REFERENCES læerere(id),
+    FOREIGN KEY (klasserom_kode) REFERENCES klasserom(klasserom_kode));
+``` 
+
+- Gi SELECT, UPDATE og INSERT-rettigheter til lærere
+```
+GRANT SELECT, UPDATE, INSERT ON lærere to lærer_1;
+GRANT SELECT, UPDATE, INSERT ON klasserom to lærer_1;
+GRANT SELECT, UPDATE, INSERT ON lærere_klasserom to lærer_1;
+```
+
+For å bruke det:
 ```
 INSERT INTO studenter (id, navn) VALUES (1, 'OLE HENRIKSEN');
 INSERT INTO klasserom(klasserom_kode, navn) VALUES ('DATA1500', 'Databaser');
+INSERT INTO lærere (id, navn) VALUES (1, 'Sol Berg');
+
 INSERT INTO student_klasserom(klasserom_kode, student_id) VALUES ('DATA1500', 1)
+INSERT INTO lærere_klasserom(klasserom_kode, lærer_id) VALUES ('DATA1500', 1)
 ```
 
 
@@ -122,11 +156,17 @@ INSERT INTO student_klasserom(klasserom_kode, student_id) VALUES ('DATA1500', 1)
 ### 1. Finn de 3 nyeste beskjeder fra læreren i et gitt klasserom (f.eks. klasserom_id = 1).
 
 *   **Relasjonsalgebra:**
-    > 
+    Forklaring: Relasjonsalgebra er et "matematisk programmeringsspråk" for å behandle relasjoner, bygd opp fra et lite antall operatorer. Disse operatorene produserer nye "tabeller" fra eksisterende tabeller. De er "programmer" som tar nye relasjoner som inndata og returnerer relasjoner som utdata. Man kan lage kompliserte uttrykk ved å kombinere operatorer og navngitte relasjoner(Kristoffersen, 2025).
+    >  π overskrift,innhold(γ top3,opprettet (σ lærer_id=x ∧ klasserom_kode=y(beskjeder)))
+    π projeksjon, γ sortering og σ seleksjon, ∧ betyr og
 
 *   **SQL:**
-    ```sql
-    
+    ```
+    SELECT overskrift, innhold
+    FROM beskjeder
+    WHERE lærer_id = 1 AND klasserom_kode = 'DATA1500'
+    ORDER BY opprettet DESC
+    LIMIT 3;
     ```
 
 ### 2. Vis en hel diskusjonstråd startet av en spesifikk student (f.eks. avsender_id = 2).
@@ -137,28 +177,45 @@ INSERT INTO student_klasserom(klasserom_kode, student_id) VALUES ('DATA1500', 1)
 *   **SQL (med `WITH RECURSIVE`):**
 
     Du kan vente med denne oppgaven til vi har gått gjennom avanserte SQL-spørringer (tips: må bruke en rekursiv konstruksjon `WITH RECURSIVE diskusjonstraad AS (..) SELECT FROM diskusjonstraad ...`)
-    ```sql
+    ```
+    WITH RECURSIVE diskusjonstråd AS (
+    SELECT innlegg_kode, innhold, df_kode 
+    FROM innlegg 
+    WHERE student_id = 2 AND df_kode IS NULL
+    
+    UNION ALL
+    
+    -- REKURSIV DEL: Finn alle svar (uavhengig av hvem som skrev svaret!) 
+    -- som er koblet til innleggene i tråden vår
+    SELECT i.innlegg_kode, i.innhold, i.df_kode 
+    FROM innlegg i
+    JOIN diskusjonstråd dt ON i.df_kode = dt.innlegg_kode
+    )
+    SELECT * FROM diskusjonstråd;
     
     ```
 
 ### 3. Finn alle studenter i en spesifikk gruppe (f.eks. gruppe_id = 1).
 
 *   **Relasjonsalgebra:**
-    > 
+    > π student_id (σ klasserom_kode=1 (student_klasserom))
 
 *   **SQL:**
-    ```sql
+    ```
+    SELECT student_id from student_klasserom 
+    WHERE klasserom_kode = 1;
     
     ```
 
 ### 4. Finn antall grupper.
 
 *   **Relasjonsalgebra (med aggregering):**
-    > 
+    > γ COUNT(klasserom_kode)(klasserom)
 
 *   **SQL:**
-    ```sql
-    
+    ```
+    SELECT COUNT(*) AS antall_klasserom
+    FROM klasserom;
     ```
 
 ## Del 5: Implementer i postgreSQL i din Docker container
