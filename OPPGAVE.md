@@ -51,11 +51,7 @@ I et klasserom kan studentene lese beskjeder fra læreren. Hvert klasserom har o
 
 **Ditt svar:**
 
-![Mermaid diagramm](oppgave1-4-4diagram.jpg)
-
-To tredjeparter(student_klasserom og lærer_klasserom) ble laget for å tillate at mange studenter og lærere kan delta i flere klasserom og dermed kan disse koblingstabellene håndtere mange studenter og lærere på tvers av mange fag uten problemer. 
-
-Lærere og studenter-tabellene inneholder bare info om dem(id her), mens klasserom-tabellen inneholder info om rommet(navn og kode) og lærer og student klasserom-tabellen inneholder hvem som er hvor.
+![Mermaid diagramm](diagram.png)
 
 ## Del 3: Datadefinisjon (DDL) og Mock-Data
 
@@ -89,7 +85,7 @@ CREATE ROLE student_1 LOGIN PASSWORD 'student123';
 - Opprette koblingstabell
 
 ``` 
-CREATE TABLE student_klasserom (
+CREATE TABLE gruppe_klasserom (
     student_id INT,
     klasserom_kode VARCHAR(20),
     PRIMARY KEY (student_id, klasserom_kode),
@@ -101,7 +97,7 @@ CREATE TABLE student_klasserom (
 ```
 GRANT SELECT ON studenter to student_1;
 GRANT SELECT ON klasserom to student_1;
-GRANT SELECT ON student_klasserom to student_1;
+GRANT SELECT ON gruppe_klasserom to student_1;
 ```
 
 For lærere
@@ -133,7 +129,7 @@ CREATE TABLE lærere_klasserom (
 ```
 GRANT SELECT, UPDATE, INSERT ON lærere to lærer_1;
 GRANT SELECT, UPDATE, INSERT ON klasserom to lærer_1;
-GRANT SELECT, UPDATE, INSERT ON lærere_klasserom to lærer_1;
+GRANT SELECT, UPDATE, INSERT ON gruppe_klasserom to lærer_1;
 ```
 
 For å bruke det:
@@ -142,8 +138,8 @@ INSERT INTO studenter (id, navn) VALUES (1, 'OLE HENRIKSEN');
 INSERT INTO klasserom(klasserom_kode, navn) VALUES ('DATA1500', 'Databaser');
 INSERT INTO lærere (id, navn) VALUES (1, 'Sol Berg');
 
-INSERT INTO student_klasserom(klasserom_kode, student_id) VALUES ('DATA1500', 1)
-INSERT INTO lærere_klasserom(klasserom_kode, lærer_id) VALUES ('DATA1500', 1)
+INSERT INTO gruppe_klasserom(klasserom_kode, student_id) VALUES ('DATA1500', 1)
+INSERT INTO gruppe_klasserom(klasserom_kode, lærer_id) VALUES ('DATA1500', 1)
 ```
 
 
@@ -178,31 +174,47 @@ INSERT INTO lærere_klasserom(klasserom_kode, lærer_id) VALUES ('DATA1500', 1)
 
     Du kan vente med denne oppgaven til vi har gått gjennom avanserte SQL-spørringer (tips: må bruke en rekursiv konstruksjon `WITH RECURSIVE diskusjonstraad AS (..) SELECT FROM diskusjonstraad ...`)
     ```
-    WITH RECURSIVE diskusjonstråd AS (
-    SELECT innlegg_kode, innhold, df_kode 
-    FROM innlegg 
-    WHERE student_id = 2 AND df_kode IS NULL
-    
-    UNION ALL
-    
-    -- REKURSIV DEL: Finn alle svar (uavhengig av hvem som skrev svaret!) 
-    -- som er koblet til innleggene i tråden vår
-    SELECT i.innlegg_kode, i.innhold, i.df_kode 
-    FROM innlegg i
-    JOIN diskusjonstråd dt ON i.df_kode = dt.innlegg_kode
-    )
-    SELECT * FROM diskusjonstråd;
+        WITH RECURSIVE DiskusjonsTraad AS (
+            -- 1. ANKER-LEDD: Finn startinnlegget fra studenten
+            SELECT 
+                innlegg_kode, 
+                overskrift, 
+                innhold, 
+                opprettet, 
+                bruker_id, 
+                svar_paa_innlegg_id,
+                1 AS nivaa -- Vi starter på nivå 1
+            FROM innlegg
+            WHERE bruker_id = 2 AND svar_paa_innlegg_id IS NULL
+
+            UNION ALL
+
+            -- 2. REKURSIVT LEDD: Finn alle svar som peker til innlegg i DiskusjonsTraad
+            SELECT 
+                i.innlegg_kode, 
+                i.overskrift, 
+                i.innhold, 
+                i.opprettet, 
+                i.bruker_id, 
+                i.svar_paa_innlegg_id,
+                dt.nivaa + 1
+            FROM innlegg i
+            INNER JOIN DiskusjonsTraad dt ON i.svar_paa_innlegg_id = dt.innlegg_kode
+        )
+        -- 3. RESULTAT: Vis hele tråden sortert etter nivå og tid
+        SELECT * FROM DiskusjonsTraad
+        ORDER BY nivaa ASC, opprettet ASC;
     
     ```
 
 ### 3. Finn alle studenter i en spesifikk gruppe (f.eks. gruppe_id = 1).
 
 *   **Relasjonsalgebra:**
-    > π student_id (σ klasserom_kode=1 (student_klasserom))
+    > π student_id (σ klasserom_kode=1 (gruppe_klasserom))
 
 *   **SQL:**
     ```
-    SELECT student_id from student_klasserom 
+    SELECT student_id from gruppe_klasserom 
     WHERE klasserom_kode = 1;
     
     ```
